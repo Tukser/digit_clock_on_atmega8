@@ -1,12 +1,6 @@
-/*
- * clock.c
- *
- * Created: 12.04.2018 23:14:57
- * Author : aidar
- */ 
 #include "main.h"
-	uint8_t i;
-	uint8_t r1,r2,r3,r4;
+	uint8_t number_rank;
+	uint8_t digit_rank_one,digit_rank_two,digit_rank_tree,digit_rank_thou;
 	uint8_t second, minute;
 	int hour;
 enum 
@@ -26,39 +20,36 @@ enum
 void main (void)
 {
 	cli();
-	init_Pin();
-	init_Timer_light();
-	init_Timer();
-	init_button_int_hour();
-	init_button_int_minute();	
+	init_pin();
+	init_timer_light();
+	init_timer();
+	init_timer_button();	
 	sei();
 	while (1) {
-		convert_number_hour();	
+		convert_number_clock();	
 	}
 }
 
-void init_Pin(void) 
+void init_pin(void) 
 {
-	DDRD |= 0xFF;
-	PORTD |= 0x00;
-	DDRC |= (1<<PC3);
-	PORTC &= ~(1<<PC3);
+	PIND_OUT;
+	PIND_LOW;
+	PINC_OUT;
+	PINC_LOW;
 	//This is tact button minute and hour
-	DDRD &= ~(1<<PD2);
-	PORTD &=~(1<<PD2);
-	DDRD &= ~(1<<PD3);
-	PORTD &=~(1<<PD3);
+	TACT_BUTTON_OUT;
+	TACT_BUTTON_LOW;
 }	
 
-void init_Timer_light (void) 
+void init_timer_light(void) 
 {
 	SFIOR |= (1<<PSR10);
-	TIMSK |= (1<<TOIE0) ;
+	TIMSK |= (1<<TOIE0);
 	TCNT0 = 0x9c;
 	TCCR0 |= (1<<CS01);		
 }
 
-void init_Timer(void) 
+void init_timer(void) 
 {
 	TIMSK |=(1<<OCIE1A);
 	TCCR1B |= (1<<WGM12);
@@ -107,50 +98,50 @@ uint8_t change_digit(uint8_t *buffer) {
 		return ZERO;
 }
 
-void convert_number_hour() 
+void convert_number_clock() 
 {	
-	r4 = hour/1000;
-	r3 = hour/100%10;
-	r2 = minute/10%10;
-	r1 = minute%10;
+	digit_rank_thou = hour/1000;
+	digit_rank_tree = hour/100%10;
+	digit_rank_two = minute/10%10;
+	digit_rank_one = minute%10;
 }
 
 ISR (TIMER0_OVF_vect)
 {
-	if (i==0)
+	if (number_rank==0)
 	{
-		PORTD &= ~(1<<PD0);
-		PORTD &= ~(1<<PD1);
-		PORTC &= ~(1<<PC3);
-		PORTD |= (1<<PD4);
-		output_shift_register(change_digit(&r1));
+		ONE_DIGIT_OFF;
+		TWO_DIGIT_OFF;
+		THREE_DIGIT_OFF;
+		THOU_DIGIT_ON;
+		output_shift_register(change_digit(&digit_rank_one));
 	}
-	if (i==1)
+	if (number_rank==1)
 	{
-		PORTD &= ~(1<<PD0);
-		PORTD &= ~(1<<PD1);
-		PORTD &= ~(1<<PD4);
-		PORTC |= (1<<PC3);
-		output_shift_register(change_digit(&r2));
+		ONE_DIGIT_OFF;
+		TWO_DIGIT_OFF;
+		THOU_DIGIT_OFF;
+		THREE_DIGIT_ON;
+		output_shift_register(change_digit(&digit_rank_two));
 	}
-	if (i==2)
+	if (number_rank==2)
 	{
-		PORTD &= ~(1<<PD0);
-		PORTC &= ~(1<<PC3);
-		PORTD &= ~(1<<PD4);
-		PORTD |= (1<<PD1);
-		output_shift_register(change_digit(&r3));
+		ONE_DIGIT_OFF;
+		THREE_DIGIT_OFF;
+		THOU_DIGIT_OFF;
+		TWO_DIGIT_ON;
+		output_shift_register(change_digit(&digit_rank_tree));
 	}
-	if (i==3)
+	if (number_rank==3)
 	{
-		PORTD &= ~(1<<PD1);
-		PORTC &= ~(1<<PC3);
-		PORTD &= ~(1<<PD4);
-		PORTD |= (1<<PD0);
-		output_shift_register(change_digit(&r4));
+		TWO_DIGIT_OFF;
+		THREE_DIGIT_OFF;
+		THOU_DIGIT_OFF;
+		ONE_DIGIT_ON;
+		output_shift_register(change_digit(&digit_rank_thou));
 	}
-	i++;
-	if (i>3) i=0;
+	number_rank++;
+	if (number_rank>3) number_rank=0;
 }
 ISR (TIMER1_COMPA_vect)
 { 
@@ -166,21 +157,18 @@ ISR (TIMER1_COMPA_vect)
 	}
 	if (hour>2300) hour=0;
 }
-void init_button_int_minute()
+void init_timer_button()
 {
 	GICR |= (1<<INTF0);
 	MCUCR |= (1<<ISC01);
+	
+	GICR|=(1<<INTF1);
+	MCUCR|=(1<<ISC11);
 }
 
 ISR (INT0_vect)
 {
 	++minute;
-}
-
-void init_button_int_hour()
-{
-	GICR|=(1<<INTF1);
-	MCUCR|=(1<<ISC11);
 }
 
 ISR (INT1_vect)
